@@ -1,0 +1,23 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="{% static 'main/style.css' %}">
+    <title>
+        {% block title %}Default title{% endblock title %}
+    </title>
+</head>
+<body>
+    <div class="menubox">
+        <ul class="menu">
+            <li><a href="/">Home</a></li>
+            <li><a href="/talk_People/">Community</a></li>
+            <li><a href="/Help_People/">Help</a></li>
+            <li><a href="/Contact_People/">Contact</a></li>
+        </ul>
+    </div>
+    <div>{% block content %}{% endblock content %}</div>
+</body>
+</html>

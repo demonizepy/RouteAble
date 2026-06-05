@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Главная{% endblock title %}
+
+{% block content %}
+<h1>Карта города</h1>
+    <img src="/media/map_city.png" alt="Map_City">
+    <h1>Cписок домов</h1>
+    <ul>
+        {% for house in houses %}
+            <li>{{house.street}} {{house.number}}</li>
+            {% empty %}
+                <li>Нет доступных домов. Добавьте их через админку.</li>
+        {% endfor %}
+    </ul>
+    <li>><a href="{% url 'admin:index' %}">Добавление домов</a></li>
+{% endblock content %}
