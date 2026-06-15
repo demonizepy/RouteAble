@@ -12,7 +12,7 @@ from .permissions import IsAdminReadOnly, IsOwnerOrReadOnly
 from rest_framework.authentication import TokenAuthentication
 from .pagination import HouseApiListPagination
 from .forms import HouseForm
-
+from django.contrib.auth.decorators import login_required
 # Create perfomance 
 
 # ------------------------------Представления для обработки запросов на отображение страниц сайта---------------------------------
@@ -35,6 +35,7 @@ def map_view(request):
     return render(request, 'map.html', {'form': form})
 
 
+@login_required(login_url='/login/')  # Перенаправит на логин, если пользователь не вошел
 def map_view(request):
     if request.method == 'POST':
         form = HouseForm(request.POST)
@@ -54,8 +55,7 @@ def map_view(request):
 
     houses = House.objects.all()
     
-    # ИСПРАВЛЕНИЕ: если map.html лежит в templates/map.html, пишем просто 'map.html'
-    # Если он лежит в templates/main/map.html — оставляем 'main/map.html'
+    # Оставляем 'map.html', так как файлы лежат в templates напрямую
     return render(request, 'map.html', {'form': form, 'houses': houses})
 
 # -----------------------------API для работы с объектами House---------------------------------
