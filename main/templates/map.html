@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+    
+    <link rel="stylesheet" type="text/css" href="{% static 'main/style.css' %}">
+    <title>RouteAble Map</title>
+
+    <style>
+        /* Главный контейнер для карты и формы */
+        .map-layout-container {
+            display: flex;
+            flex-direction: row;
+            max-width: 1400px;
+            margin: 20px auto;
+            gap: 20px;
+            padding: 0 15px;
+            box-sizing: border-box;
+        }
+
+        /* Четко задаем размеры карты, чтобы она не сжималась во флексе */
+        #map {
+            width: 900px;  /* Ширина карты */
+            height: 700px; /* Высота карты */
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        /* Правая боковая панель для формы */
+        .sidebar-panel {
+            flex: 1; /* Форма займет все оставшееся место справа */
+            background: #fdfdfd;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            height: 700px; /* Высота вровень с картой */
+        }
+
+        .sidebar-panel h3 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            font-family: sans-serif;
+            color: #2c3e50;
+            border-bottom: 2px solid #edf2f7;
+            padding-bottom: 8px;
+        }
+
+        /* Вертикальное отображение полей Django-формы */
+        .django-sidebar-form p {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin: 0 0 14px 0;
+            font-size: 13px;
+            font-family: sans-serif;
+            color: #4a5568;
+            text-align: left;
+        }
+
+        .django-sidebar-form input, 
+        .django-sidebar-form select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        /* Кнопка сохранения */
+        .submit-btn {
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 11px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: auto; /* Прижать к низу */
+            transition: background 0.2s;
+        }
+
+        .submit-btn:hover {
+            background: #1a252f;
+        }
+    </style>
+</head>
+
+{% block content %}
+<body>
+    <div class="menubox">
+        <div class="logo">RouteAble</div>
+        <ul class="menu">
+            <li><a href="/">Home</a></li>
+            <li><a href="/talk_People/">Community</a></li>
+            <li><a href="/map/">Map</a></li>
+            <li><a href="/Help_People/">Help</a></li>
+            <li><a href="/Contact_People/">Contact</a></li>
+        </ul>
+    </div>
+
+    <div class="map-layout-container">
+        
+        <div class="sidebar-panel" id="info-panel">
+            <h3>Информация об объекте</h3>
+            <div id="info-content" class="info-panel-content">
+                <p class="info-panel-placeholder">
+                    Выберите маркер на карте, чтобы увидеть информацию о доме.
+                </p>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+
+        <div class="sidebar-panel">
+            <h3>Добавить дом</h3>
+            <form method="post">
+                {% csrf_token %}
+                
+                <input type="hidden" id="sidebar-lat" name="latitude" value="" required>
+                <input type="hidden" id="sidebar-lng" name="longitude" value="" required>
+                
+                <div class="django-sidebar-form">
+                    {{ form }}
+                </div>
+                
+                <input type="submit" value="Сохранить" class="submit-btn">
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        // 1. Инициализация карты
+        var map = L.map('map').setView([55.030206, 82.920419], 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        var currentMarker = null;
+
+        var latInput = document.getElementById('sidebar-lat');
+        var lngInput = document.getElementById('sidebar-lng');
+        var infoContent = document.getElementById('info-content');
+
+        // =================================================================
+        // ВЫВОД МАРКЕРОВ ИЗ БАЗЫ С ДЕЙСТВИЕМ ПРИ КЛИКЕ
+        // =================================================================
+        {% for house in houses %}
+            {% if house.latitude and house.longitude %}
+                (function() {
+                    var marker = L.marker([{{ house.latitude }}, {{ house.longitude }}]).addTo(map);
+                    
+                    marker.on('click', function() {
+                        // Сначала создаем базовый HTML-шаблон для вывода основных полей
+                        var html = `
+                            <div class="info-item"><strong>Город:</strong> ${"{{ house.city.name }}"}</div>
+                            <div class="info-item"><strong>Улица:</strong> ${"{{ house.street }}"}</div>
+                            <div class="info-item"><strong>Номер дома:</strong> ${"{{ house.number }}"}</div>
+                            <div class="info-item"><strong>Количество этажей:</strong> ${"{{ house.floors }}"}</div>
+                            <div class="info-item"><strong>Наличие лифта:</strong> ${"{{ house.elevator.condition }}"}</div>
+                        `;
+
+                        // Теперь проверяем статус лифта ВНЕ строки. 
+                        // Если в базе записано "Есть", добавляем к нашей строке размеры лифта
+                        if ("{{ house.elevator.condition }}" === "Есть") {
+                            html += `<div class="info-item"><strong>Размеры лифта (Ш x Д):</strong> ${"{{ house.elevator.size_width }}"} x ${"{{ house.elevator.size_length }}"} см</div>`;
+                        }
+
+                        // Отправляем готовый собранный HTML в панель информации
+                        infoContent.innerHTML = html;
+                    });
+                })();
+            {% endif %}
+        {% endfor %}
+        // =================================================================
+
+        // 2. Клик по карте для добавления новой метки
+        function onMapClick(e) {
+            var lat = e.latlng.lat.toFixed(6);
+            var lng = e.latlng.lng.toFixed(6);
+
+            latInput.value = lat;
+            lngInput.value = lng;
+
+            if (currentMarker) {
+                currentMarker.setLatLng(e.latlng);
+            } else {
+                currentMarker = L.marker(e.latlng).addTo(map);
+            }
+        }
+
+        map.on('click', onMapClick);
+    </script>
+</body>
+{% endblock content %}
+</html>

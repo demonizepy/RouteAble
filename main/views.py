@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from main.models import House
 from rest_framework import generics, viewsets
 from .serializers import HouseSerializer
@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from .permissions import IsAdminReadOnly, IsOwnerOrReadOnly
 from rest_framework.authentication import TokenAuthentication
 from .pagination import HouseApiListPagination
+from .forms import HouseForm
 
 # Create perfomance 
 
@@ -29,6 +30,33 @@ def help(request):
 def contact(request):
     return render(request, 'page3.html')
 
+def map_view(request):
+    form = HouseForm()
+    return render(request, 'map.html', {'form': form})
+
+
+def map_view(request):
+    if request.method == 'POST':
+        form = HouseForm(request.POST)
+        if form.is_valid():
+            house = form.save(commit=False)
+            # Забираем координаты из скрытых полей формы
+            house.latitude = request.POST.get('latitude')
+            house.longitude = request.POST.get('longitude')
+            
+            if request.user.is_authenticated:
+                house.user = request.user
+                
+            house.save()
+            return redirect('/map/')
+    else:
+        form = HouseForm()
+
+    houses = House.objects.all()
+    
+    # ИСПРАВЛЕНИЕ: если map.html лежит в templates/map.html, пишем просто 'map.html'
+    # Если он лежит в templates/main/map.html — оставляем 'main/map.html'
+    return render(request, 'map.html', {'form': form, 'houses': houses})
 
 # -----------------------------API для работы с объектами House---------------------------------
 

@@ -30,21 +30,22 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
     # ------------------------------URL для обработки запросов на отображение страниц сайта---------------------------------
-    path('admin/', admin.site.urls),
-    path('', views.index),
-    path('talk_People/', views.talk),
-    path('Help_People/', views.help),
-    path('Contact_People/', views.contact),
+    path('admin/', admin.site.urls, name='admin'), # добавление URL для доступа к административной панели Django, при обращении к этому URL будет вызван соответствующий метод класса AdminSite из библиотеки Django для отображения административной панели
+    path('', views.index, name='index'),
+    path('talk_People/', views.talk, name='talk'),
+    path('Help_People/', views.help, name='help'),
+    path('Contact_People/', views.contact, name='contact'),
+    path('map/', views.map_view, name='map'), # добавление URL для отображения страницы с картой, при обращении к этому URL будет вызван метод map_view() из модуля views для отображения страницы с картой
     
     # ------------------------------URL для обработки запросов к API---------------------------------
-    path('api/v1/houses/', views.HouseAPIList.as_view()), # добавление URL для обработки GET и POST запросов, при обращении к этому URL будет вызван метод get() или post() класса HouseAPIList в зависимости от типа запроса
-    path('api/v1/houses/<int:pk>/', views.HouseAPIUpdate.as_view()), # добавление URL для обработки GET и PUT запросов, при обращении к этому URL будет вызван метод get() или put() класса HouseAPIUpdate в зависимости от типа запроса
-    path('api/v1/housesdelete/<int:pk>/', views.HouseAPIDestroy.as_view()), # добавление URL для обработки GET и DELETE запросов, при обращении к этому URL будет вызван метод get() или delete() класса HouseAPIDestroy в зависимости от типа запроса
-    path('api/v1/map/', include('rest_framework.urls')), # добавление URL для обработки запросов на вход в систему, при обращении к этому URL будет вызван соответствующий метод класса LoginView из библиотеки Django REST Framework для обработки аутентификации пользователей через API
+    path('api/v1/houses/', views.HouseAPIList.as_view(), name='house-list'), # добавление URL для обработки GET и POST запросов, при обращении к этому URL будет вызван метод get() или post() класса HouseAPIList в зависимости от типа запроса
+    path('api/v1/houses/<int:pk>/', views.HouseAPIUpdate.as_view(), name='house-update'), # добавление URL для обработки GET и PUT запросов, при обращении к этому URL будет вызван метод get() или put() класса HouseAPIUpdate в зависимости от типа запроса
+    path('api/v1/housesdelete/<int:pk>/', views.HouseAPIDestroy.as_view(), name='house-destroy'), # добавление URL для обработки GET и DELETE запросов, при обращении к этому URL будет вызван метод get() или delete() класса HouseAPIDestroy в зависимости от типа запроса
+    path('api/v1/map/', include('rest_framework.urls'), name='login'), # добавление URL для обработки запросов на вход в систему, при обращении к этому URL будет вызван соответствующий метод класса LoginView из библиотеки Django REST Framework для обработки аутентификации пользователей через API
     
     # ------------------------------API для аутентификации пользователей через API с помощью библиотеки Djoser---------------------------------
-    path('api/v1/auth/', include('djoser.urls')), # добавление URL для обработки запросов на регистрацию, вход в систему, выход из системы и изменение пароля, при обращении к этому URL будет вызван соответствующий метод класса UserViewSet из библиотеки Djoser для обработки аутентификации пользователей через API
-    re_path('api/v1/auth/', include('djoser.urls.authtoken')), # добавление URL для обработки запросов на получение и удаление токена аутентификации, при обращении к этому URL будет вызван соответствующий метод класса TokenViewSet из библиотеки Djoser для обработки аутентификации пользователей через API с использованием токенов
+    path('api/v1/auth/', include('djoser.urls'), name='auth'), # добавление URL для обработки запросов на регистрацию, вход в систему, выход из системы и изменение пароля, при обращении к этому URL будет вызван соответствующий метод класса UserViewSet из библиотеки Djoser для обработки аутентификации пользователей через API
+    re_path('api/v1/auth/', include('djoser.urls.authtoken'), name='auth-token'), # добавление URL для обработки запросов на получение и удаление токена аутентификации, при обращении к этому URL будет вызван соответствующий метод класса TokenViewSet из библиотеки Djoser для обработки аутентификации пользователей через API с использованием токенов
     
     # ------------------------------API для аутентификации пользователей через API с помощью библиотеки Simple JWT---------------------------------
     path('api/v1/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'), # добавление URL для обработки запросов на получение пары токенов (access и refresh), при обращении к этому URL будет вызван метод post() класса TokenObtainPairView из библиотеки Simple JWT для обработки аутентификации пользователей через API с использованием JSON Web Tokens

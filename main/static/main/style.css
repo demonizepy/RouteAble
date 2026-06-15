@@ -1,42 +1,201 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-image: url("{% static './media/background.png' %}");
+    background-image: url("../media/background.png");
     background-size: cover;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding-top: 50px;
+    margin: 0;
+    padding: 0;
 }
 
+/* Сама шапка сайта */
+.menubox {
+    box-sizing: border-box;
+    /* Чтобы padding не раздувал ширину */
+    width: 100%;
+    background-color: white;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+
+    /* Флексбокс расталкивает логотип влево, а меню вправо */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    /* Внутренние отступы, чтобы текст не прилипал к краям экрана */
+    padding: 0 40px;
+}
+
+/* Стили для названия RouteAble */
+.logo {
+    font-size: 24px;
+    font-weight: bold;
+    color: #2c3e50;
+    /* Можно добавить кастомный шрифт, если захочется */
+}
+
+/* Стили для списка меню */
+ul.menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+/* Элементы меню (больше не кнопки) */
+ul.menu li {
+    margin-left: 25px;
+    /* Отступы между пунктами меню */
+    padding: 20px 0;
+    /* Задает высоту всей шапки */
+    transition: transform 0.2s ease-in-out;
+}
+
+ul.menu li:hover {
+    transform: scale(1.05);
+}
+
+/* Красивые ссылки без подчеркиваний */
+.menu a {
+    text-decoration: none;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.menu a:hover {
+    color: #3498db;
+    /* Цвет при наведении */
+}
+
+/* Заголовок "КАРТА ГОРОДА" */
 h1 {
     color: #2c3e50;
     text-transform: uppercase;
     letter-spacing: 2px;
-    display: block;
-
+    margin-bottom: 20px;
 }
 
-ul {
-    list-style: none;
-    padding: 0;
+
+/* ==========================================================================
+   Кнопки и Карта (Страница /map/)
+   ========================================================================== */
+
+/* Контейнер на всю ширину экрана */
+.map-layout-container {
     display: flex;
-    justify-content: center;
-    justify-content: row;
-    flex-wrap: wrap;
-
+    flex-direction: row;
+    width: 100%;
+    max-width: 1800px;
+    margin: 20px auto;
+    gap: 25px;
+    padding: 0 30px;
+    box-sizing: border-box;
 }
 
-li {
-    background: white;
-    margin: 10px 0;
-    padding: 15px 25px;
+/* Огромная резиновая карта */
+#map {
+    flex: 2;
+    min-width: 700px;
+    height: 750px;
     border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.185);
-    transition: transform 0.2s ease-in-out;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-li:hover {
-    transform: scale(1.05);
+/* Стили для боковых панелей (информация и добавление) */
+.sidebar-panel {
+    width: 380px;
+    flex-shrink: 0;
+    background: #fdfdfd;
+    border: 1px solid #e2e8f0;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 750px;
+}
 
+.sidebar-panel h3 {
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    font-family: sans-serif;
+    color: #2c3e50;
+    border-bottom: 2px solid #edf2f7;
+    padding-bottom: 8px;
+    text-align: left;
+}
+
+/* Блок текстового контента в левой панели */
+.info-panel-content {
+    font-family: sans-serif;
+    color: #4a5568;
+    line-height: 1.6;
+    text-align: left;
+}
+
+/* Стартовая подсказка-заглушка */
+.info-panel-placeholder {
+    color: #a0aec0;
+    font-style: italic;
+    text-align: center;
+    margin-top: 40px;
+}
+
+/* Элементы карточки информации о доме */
+.info-item {
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.info-item strong {
+    color: #2c3e50;
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+/* Стилизация полей Django-формы */
+.django-sidebar-form p {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0 0 14px 0;
+    font-size: 13px;
+    font-family: sans-serif;
+    color: #4a5568;
+    text-align: left;
+}
+
+.django-sidebar-form input,
+.django-sidebar-form select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+/* Главная кнопка отправки формы */
+.submit-btn {
+    background: #2c3e50;
+    color: white;
+    border: none;
+    padding: 11px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    margin-top: auto;
+    transition: background 0.2s;
+}
+
+.submit-btn:hover {
+    background: #1a252f;
 }

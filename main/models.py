@@ -6,9 +6,18 @@ class Elevator(models.Model):
     condition = models.CharField(max_length=100)
     size_width = models.IntegerField()
     size_length = models.IntegerField()
+    
+    def __str__(self):
+        return self.condition + ' ' + str(self.size_width) + 'x' + str(self.size_length)
+    
+class City(models.Model):
+    name = models.CharField(max_length=100)
+    
+    def __str__(self):
+        return self.name
 
 class House(models.Model):
-    city = models.CharField(max_length=1000)
+    city = models.ForeignKey('City', on_delete=models.CASCADE)
     street = models.CharField(max_length=500)
     number = models.CharField(max_length=100)
     floors = models.IntegerField()
@@ -22,6 +31,9 @@ class House(models.Model):
     
 class RampType(models.Model):
     title = models.CharField(max_length=500, unique=True)
+
+    def __str__(self):
+        return self.title
 
 class Ramps(models.Model):
     degrees = models.FloatField()
