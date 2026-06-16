@@ -45,16 +45,16 @@
         <div id="map"></div>
 
         <div class="sidebar-panel">
-            <h3>Добавить дом</h3>
+            <h3 id="form-title">Добавить дом</h3>
             <form method="post">
                 {% csrf_token %}
                 
+                <input type="hidden" id="sidebar-id" name="house_id" value="">
                 <input type="hidden" id="sidebar-lat" name="latitude" value="" required>
                 <input type="hidden" id="sidebar-lng" name="longitude" value="" required>
                 
                 <div class="django-sidebar-form">
-                    {{ form }}
-                </div>
+                    {{ form }}  </div>
                 
                 <input type="submit" value="Сохранить" class="submit-btn">
             </form>
@@ -85,29 +85,56 @@
                     var marker = L.marker([{{ house.latitude }}, {{ house.longitude }}]).addTo(map);
                     
                     marker.on('click', function() {
-                        // Сначала создаем базовый HTML-шаблон для вывода основных полей
+                        // Сохраняем значения из Django в обычные JS-переменные (защита от ошибок кавычек)
+                        var city = "{{ house.city.name|default:'' }}";
+                        var street = "{{ house.street|default:'' }}";
+                        var number = "{{ house.number|default:'' }}";
+                        var floors = "{{ house.floors|default:'' }}";
+                        var elevatorCondition = "{{ house.elevator.condition|default:'' }}";
+                        var elevatorWidth = "{{ house.elevator.size_width|default:'0' }}";
+                        var elevatorLength = "{{ house.elevator.size_length|default:'0' }}";
+
+                        // ПОЛЕЗНО ДЛЯ ОТЛАДКИ: Выведет данные в консоль браузера (F12 -> Console) при клике
+                        console.log("Кликнули по дому:", street, number, "Статус лифта:", elevatorCondition, "Размеры:", elevatorWidth, "x", elevatorLength);
+
+                        // Формируем базовый HTML-шаблон для левой панели
                         var html = `
-                            <div class="info-item"><strong>Город:</strong> ${"{{ house.city.name }}"}</div>
-                            <div class="info-item"><strong>Улица:</strong> ${"{{ house.street }}"}</div>
-                            <div class="info-item"><strong>Номер дома:</strong> ${"{{ house.number }}"}</div>
-                            <div class="info-item"><strong>Количество этажей:</strong> ${"{{ house.floors }}"}</div>
-                            <div class="info-item"><strong>Наличие лифта:</strong> ${"{{ house.elevator.condition }}"}</div>
+                            <div class="info-item"><strong>Город:</strong> ${city}</div>
+                            <div class="info-item"><strong>Улица:</strong> ${street}</div>
+                            <div class="info-item"><strong>Номер дома:</strong> ${number}</div>
+                            <div class="info-item"><strong>Количество этажей:</strong> ${floors}</div>
+                            <div class="info-item"><strong>Наличие лифта:</strong> ${elevatorCondition}</div>
                         `;
 
-                        // Теперь проверяем статус лифта ВНЕ строки. 
-                        // Если в базе записано "Есть", добавляем к нашей строке размеры лифта
-                        if ("{{ house.elevator.condition }}" === "Есть") {
-                            html += `<div class="info-item"><strong>Размеры лифта (Ш x Д):</strong> ${"{{ house.elevator.size_width }}"} x ${"{{ house.elevator.size_length }}"} см</div>`;
+                        // Улучшенная проверка: ищем слово "Есть" без учёта регистра и лишних пробелов
+                        if (elevatorCondition.toLowerCase().includes('есть')) {
+                            html += `<div class="info-item"><strong>Размеры лифта (Ш x Д):</strong> ${elevatorWidth} x ${elevatorLength} см</div>`;
                         }
-
-                        // Отправляем готовый собранный HTML в панель информации
+                        
+                        // Отправляем собранный HTML в левую панель информации
                         infoContent.innerHTML = html;
+
+                        // ЗАПОЛНЯЕМ ФОРМУ СПРАВА ДЛЯ РЕДАКТИРОВАНИЯ:
+                        document.getElementById('sidebar-id').value = "{{ house.id }}";
+                        document.getElementById('sidebar-lat').value = "{{ house.latitude }}";
+                        document.getElementById('sidebar-lng').value = "{{ house.longitude }}";
+                        
+                        if(document.getElementById('id_city')) document.getElementById('id_city').value = "{{ house.city.id }}";
+                        if(document.getElementById('id_street')) document.getElementById('id_street').value = street;
+                        if(document.getElementById('id_number')) document.getElementById('id_number').value = number;
+                        if(document.getElementById('id_floors')) document.getElementById('id_floors').value = floors;
+                        if(document.getElementById('id_elevator')) document.getElementById('id_elevator').value = "{{ house.elevator.id }}";
+                        if(document.getElementById('id_elevator_width')) document.getElementById('id_elevator_width').value = elevatorWidth;
+                        if(document.getElementById('id_elevator_length')) document.getElementById('id_elevator_length').value = elevatorLength;
+
+                        // Проверяем видимость полей размеров лифта для формы справа
+                        toggleElevatorSizes();
                     });
                 })();
             {% endif %}
         {% endfor %}
         // =================================================================
-
+        
         // 2. Клик по карте для добавления новой метки
         function onMapClick(e) {
             var lat = e.latlng.lat.toFixed(6);
@@ -124,6 +151,45 @@
         }
 
         map.on('click', onMapClick);
+
+        // Функция, которая управляет видимостью полей размеров лифта
+            function toggleElevatorSizes() {
+                var elevatorSelect = document.getElementById('id_elevator');
+                var widthInput = document.getElementById('id_elevator_width');
+                var lengthInput = document.getElementById('id_elevator_length');
+
+                if (!elevatorSelect || !widthInput || !lengthInput) return;
+
+                // Получаем текст выбранного варианта в выпадающем списке ("Есть", "Нет" и т.д.)
+                var selectedText = elevatorSelect.options[elevatorSelect.selectedIndex].text;
+                
+                // Находим родительские контейнеры (обычно это теги <p>, в которых Django заматывает поля)
+                var widthContainer = widthInput.closest('p') || widthInput.parentElement;
+                var lengthContainer = lengthInput.closest('p') || lengthInput.parentElement;
+
+                // Если выбрано "Есть" — показываем поля, иначе — скрываем и очищаем их
+                if (selectedText.includes('Есть')) {
+                    widthContainer.style.display = 'block';
+                    lengthContainer.style.display = 'block';
+                } else {
+                    widthContainer.style.display = 'none';
+                    lengthContainer.style.display = 'none';
+                    widthInput.value = '';
+                    lengthInput.value = '';
+                }
+            }
+
+            // 1. Навешиваем событие изменения на выпадающий список лифта
+            document.addEventListener("DOMContentLoaded", function() {
+                var elevatorSelect = document.getElementById('id_elevator');
+                if (elevatorSelect) {
+                    elevatorSelect.addEventListener('change', toggleElevatorSizes);
+                    // Запускаем один раз при загрузке страницы, чтобы изначально скрыть поля
+                    toggleElevatorSizes();
+                }
+            });
+
+
     </script>
 </body>
 {% endblock content %}

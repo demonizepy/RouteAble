@@ -8,7 +8,7 @@ class Elevator(models.Model):
     size_length = models.IntegerField()
     
     def __str__(self):
-        return self.condition + ' ' + str(self.size_width) + 'x' + str(self.size_length)
+        return self.condition 
     
 class City(models.Model):
     name = models.CharField(max_length=100)

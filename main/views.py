@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from main.models import House
+from main.models import House, Elevator
 from rest_framework import generics, viewsets
 from .serializers import HouseSerializer
 from rest_framework.views import APIView
@@ -35,27 +35,43 @@ def map_view(request):
     return render(request, 'map.html', {'form': form})
 
 
-@login_required(login_url='/login/')  # Перенаправит на логин, если пользователь не вошел
+@login_required(login_url='/login/')
 def map_view(request):
     if request.method == 'POST':
-        form = HouseForm(request.POST)
+        house_id = request.POST.get('house_id')
+        
+        # Если редактируем существующий дом — берем его, иначе создаем новый
+        instance = House.objects.filter(id=house_id).first() if house_id else None
+        form = HouseForm(request.POST, instance=instance)
+        
         if form.is_valid():
             house = form.save(commit=False)
-            # Забираем координаты из скрытых полей формы
             house.latitude = request.POST.get('latitude')
             house.longitude = request.POST.get('longitude')
             
             if request.user.is_authenticated:
                 house.user = request.user
-                
+            
+            # 1. Сначала сохраняем дом, чтобы зафиксировать связь с лифтом
             house.save()
+
+            # 2. Получаем размеры из очищенных данных формы
+            width = form.cleaned_data.get('elevator_width')
+            length = form.cleaned_data.get('elevator_length')
+
+            # 3. Сохраняем размеры непосредственно в привязанный объект лифта
+            if house.elevator and "Есть" in house.elevator.condition:
+                # Если ширина и длина были введены пользователем
+                if width is not None and length is not None:
+                    house.elevator.size_width = width
+                    house.elevator.size_length = length
+                    house.elevator.save() # Сохраняем изменения в таблицу Elevator
+
             return redirect('/map/')
     else:
         form = HouseForm()
 
     houses = House.objects.all()
-    
-    # Оставляем 'map.html', так как файлы лежат в templates напрямую
     return render(request, 'map.html', {'form': form, 'houses': houses})
 
 # -----------------------------API для работы с объектами House---------------------------------
