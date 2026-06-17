@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from main.models import House, Elevator
+from main.models import House, Elevator, Ramps, Availability
 from rest_framework import generics, viewsets
 from .serializers import HouseSerializer
 from rest_framework.views import APIView
@@ -49,24 +49,49 @@ def map_view(request):
             house.latitude = request.POST.get('latitude')
             house.longitude = request.POST.get('longitude')
             
+            # Привязываем пользователя
             if request.user.is_authenticated:
                 house.user = request.user
-            
-            # 1. Сначала сохраняем дом, чтобы зафиксировать связь с лифтом
-            house.save()
+            else:
+                from django.contrib.auth.models import User
+                house.user = User.objects.filter(is_superuser=True).first() or User.objects.first()
 
-            # 2. Получаем размеры из очищенных данных формы
+            # --- ЛОГИКА СОХРАНЕНИЯ ЛИФТА ---
+            chosen_elevator = form.cleaned_data.get('elevator')
             width = form.cleaned_data.get('elevator_width')
             length = form.cleaned_data.get('elevator_length')
 
-            # 3. Сохраняем размеры непосредственно в привязанный объект лифта
-            if house.elevator and "Есть" in house.elevator.condition:
-                # Если ширина и длина были введены пользователем
-                if width is not None and length is not None:
-                    house.elevator.size_width = width
-                    house.elevator.size_length = length
-                    house.elevator.save() # Сохраняем изменения в таблицу Elevator
+            if chosen_elevator:
+                # Создаем ИНДИВИДУАЛЬНУЮ запись лифта для этого дома
+                new_elevator = Elevator.objects.create(
+                    condition=chosen_elevator.condition,
+                    size_width=width if (width is not None and "Есть" in chosen_elevator.condition) else 0,
+                    size_length=length if (length is not None and "Есть" in chosen_elevator.condition) else 0
+                )
+                house.elevator = new_elevator  # Привязываем личный лифт к дому
 
+            # --- ЛОГИКА СОХРАНЕНИЯ ПАНДУСА ---
+            chosen_ramp = form.cleaned_data.get('ramps')
+            # Исправили опечатку: убрали 's' из 'ramps_degrees' -> 'ramp_degrees'
+            degrees = form.cleaned_data.get('ramp_degrees')
+            ramp_length = form.cleaned_data.get('ramp_length')
+
+            if chosen_ramp:
+                # Создаем ИНДИВИДУАЛЬНУЮ запись пандуса для этого дома
+                new_ramp = Ramps.objects.create(
+                    condition=chosen_ramp.condition,
+                    degrees=degrees if (degrees is not None and "Есть" in chosen_ramp.condition) else 0.0,
+                    length=ramp_length if (ramp_length is not None and "Есть" in chosen_ramp.condition) else 0.0,
+                    type="Индивидуальный"
+                )
+                house.ramps = new_ramp  # Привязываем личный пандус к дому
+
+            # Подтягиваем доступность
+            house.availability = form.cleaned_data.get('availability')
+            
+            # Сохраняем дом (теперь со своими личными ID лифта и пандуса)
+            house.save()
+                    
             return redirect('/map/')
     else:
         form = HouseForm()
