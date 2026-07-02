@@ -20,7 +20,6 @@ def index(request):
     h = House.objects.all()
     return render(request, 'index.html', {'houses': h})
 
-# Create your views here.
 def talk(request):
     return render(request, 'page1.html')
 
@@ -30,17 +29,12 @@ def help(request):
 def contact(request):
     return render(request, 'page3.html')
 
-def map_view(request):
-    form = HouseForm()
-    return render(request, 'map.html', {'form': form})
 
-
+# ОСТАВЛЯЕМ ТОЛЬКО ОДИН ПРАВИЛЬНЫЙ MAP_VIEW С ДЕКОРАТОРОМ
 @login_required(login_url='/login/')
 def map_view(request):
     if request.method == 'POST':
         house_id = request.POST.get('house_id')
-        
-        # Если редактируем существующий дом — берем его, иначе создаем новый
         instance = House.objects.filter(id=house_id).first() if house_id else None
         form = HouseForm(request.POST, instance=instance)
         
@@ -49,7 +43,6 @@ def map_view(request):
             house.latitude = request.POST.get('latitude')
             house.longitude = request.POST.get('longitude')
             
-            # Привязываем пользователя
             if request.user.is_authenticated:
                 house.user = request.user
             else:
@@ -62,62 +55,52 @@ def map_view(request):
             length = form.cleaned_data.get('elevator_length')
 
             if chosen_elevator:
-                # Создаем ИНДИВИДУАЛЬНУЮ запись лифта для этого дома
                 new_elevator = Elevator.objects.create(
                     condition=chosen_elevator.condition,
                     size_width=width if (width is not None and "Есть" in chosen_elevator.condition) else 0,
                     size_length=length if (length is not None and "Есть" in chosen_elevator.condition) else 0
                 )
-                house.elevator = new_elevator  # Привязываем личный лифт к дому
+                house.elevator = new_elevator 
 
             # --- ЛОГИКА СОХРАНЕНИЯ ПАНДУСА ---
             chosen_ramp = form.cleaned_data.get('ramps')
-            # Исправили опечатку: убрали 's' из 'ramps_degrees' -> 'ramp_degrees'
             degrees = form.cleaned_data.get('ramp_degrees')
             ramp_length = form.cleaned_data.get('ramp_length')
 
             if chosen_ramp:
-                # Создаем ИНДИВИДУАЛЬНУЮ запись пандуса для этого дома
                 new_ramp = Ramps.objects.create(
                     condition=chosen_ramp.condition,
                     degrees=degrees if (degrees is not None and "Есть" in chosen_ramp.condition) else 0.0,
                     length=ramp_length if (ramp_length is not None and "Есть" in chosen_ramp.condition) else 0.0,
                     type="Индивидуальный"
                 )
-                house.ramps = new_ramp  # Привязываем личный пандус к дому
+                house.ramps = new_ramp
 
-            # Подтягиваем доступность
             house.availability = form.cleaned_data.get('availability')
-            
-            # Сохраняем дом (теперь со своими личными ID лифта и пандуса)
             house.save()
                     
             return redirect('/map/')
     else:
         form = HouseForm()
 
-    houses = House.objects.all()
-    return render(request, 'map.html', {'form': form, 'houses': houses})
+    # Мы больше не передаем 'houses': houses в шаблон, так как JS заберет их через API!
+    return render(request, 'map.html', {'form': form})
 
-# -----------------------------API для работы с объектами House---------------------------------
 
-# -----------3 базовых класса для объяснения работы ограничения доступа к данным через API------
+# ----------------------------- API классы DRF ---------------------------------
 
-class HouseAPIList(generics.ListCreateAPIView): # API get запрос для получения списка всех объектов House и POST запрос для создания нового объекта House, данные передаются в формате JSON
+class HouseAPIList(generics.ListCreateAPIView):
+    queryset = House.objects.select_related('city', 'elevator', 'ramps', 'availability').all()
+    serializer_class = HouseSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    pagination_class = HouseApiListPagination
+
+class HouseAPIUpdate(generics.RetrieveUpdateAPIView):
     queryset = House.objects.all()
     serializer_class = HouseSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly] # разрешение доступа к этому API для всех пользователей, включая неавторизованных, без ограничения доступа к данным, данные передаются в формате JSON
-    pagination_class = HouseApiListPagination # добавление пагинации для этого API, что позволяет клиенту получать данные порциями и управлять количеством данных, получаемых за один запрос, данные передаются в формате JSON
-
-class HouseAPIUpdate(generics.RetrieveUpdateAPIView): # API get запрос для получения данных конкретного объекта House по его первичному ключу 
-    # и PUT запрос для обновления данных этого объекта, данные передаются в формате JSON
-    queryset = House.objects.all()
-    serializer_class = HouseSerializer
-    permission_classes = [IsAuthenticated] # разрешение доступа к этому API для всех пользователей, включая неавторизованных, без ограничения доступа к данным, данные передаются в формате JSON
-    # authentication_classes = [TokenAuthentication] # добавление аутентификации с помощью токенов для этого API, что позволяет ограничить доступ к данным только для авторизованных пользователей, данные передаются в формате JSON
+    permission_classes = [IsAuthenticated]
     
-class HouseAPIDestroy(generics.RetrieveDestroyAPIView): # API get запрос для получения данных конкретного объекта House по его первичному ключу, 
-    # и DELETE запрос для удаления этого объекта, данные передаются в формате JSON
+class HouseAPIDestroy(generics.RetrieveDestroyAPIView):
     queryset = House.objects.all()
     serializer_class = HouseSerializer
     permission_classes = [IsAdminReadOnly] # разрешение доступа к этому API для всех пользователей, включая неавторизованных, без ограничения доступа к данным, данные передаются в формате JSON

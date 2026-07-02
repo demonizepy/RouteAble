@@ -76,86 +76,101 @@
         var infoContent = document.getElementById('info-content');
 
         // =================================================================
-        // ВЫВОД МАРКЕРОВ ИЗ БАЗЫ С ДЕЙСТВИЕМ ПРИ КЛИКЕ
+        // АСИНХРОННАЯ ЗАГРУЗКА МАРКЕРОВ ЧЕРЕЗ API (AJAX / FETCH)
         // =================================================================
-        {% for house in houses %}
-            {% if house.latitude and house.longitude %}
-                (function() {
-                    var marker = L.marker([{{ house.latitude }}, {{ house.longitude }}]).addTo(map);
-                    
-                    marker.on('click', function() {
-                        // Сохраняем значения из Django в обычные JS-переменные
-                        var city = "{{ house.city.name|default:'' }}";
-                        var street = "{{ house.street|default:'' }}";
-                        var number = "{{ house.number|default:'' }}";
-                        var floors = "{{ house.floors|default:'' }}";
-                        var elevatorCondition = "{{ house.elevator.condition|default:'' }}";
-                        var elevatorWidth = "{{ house.elevator.size_width|default:'0' }}";
-                        var elevatorLength = "{{ house.elevator.size_length|default:'0' }}";
-                        
-                        // Получаем строковое описание пандуса через __str__ вашей модели Ramps
-                        var rampsText = "{{ house.ramps|default:'' }}"; 
-                        var rampsDegrees = "{{ house.ramps.degrees|default:'0' }}";
-                        var rampsLength = "{{ house.ramps.length|default:'0' }}";
-                        var rampsType = "{{ house.ramps.type|default:'Неизвестно' }}";
+        function loadHousesFromAPI() {
+            fetch('/api/v1/houses/')
+                .then(response => {
+                    if (!response.ok) throw new Error('Ошибка сети при запросе к API');
+                    return response.json();
+                })
+                .then(data => {
+                    // Обрабатываем пагинацию от Django REST Framework:
+                    var houses = data.results ? data.results : data;
 
-                        // Формируем базовый HTML-шаблон для левой панели информации
-                        var html = `
-                            <div class="info-item"><strong>Город:</strong> ${city}</div>
-                            <div class="info-item"><strong>Улица:</strong> ${street}</div>
-                            <div class="info-item"><strong>Номер дома:</strong> ${number}</div>
-                            <div class="info-item"><strong>Количество этажей:</strong> ${floors}</div>
-                            <div class="info-item"><strong>Наличие лифта:</strong> ${elevatorCondition}</div>
-                        `;
+                    houses.forEach(house => {
+                        if (house.latitude && house.longitude) {
+                            var marker = L.marker([house.latitude, house.longitude]).addTo(map);
+                            
+                            marker.on('click', function() {
+                                // Извлекаем данные из древовидной JSON-структуры
+                                var city = house.city ? house.city.name : 'Не указан';
+                                var street = house.street || '';
+                                var number = house.number || '';
+                                var floors = house.floors || '';
+                                
+                                var elevatorCondition = house.elevator ? house.elevator.condition : 'Нет';
+                                var elevatorWidth = house.elevator ? house.elevator.size_width : '0';
+                                var elevatorLength = house.elevator ? house.elevator.size_length : '0';
+                                
+                                var rampsCondition = house.ramps ? house.ramps.condition : 'Нет'; 
+                                var rampsDegrees = house.ramps ? house.ramps.degrees : '0';
+                                var rampsLength = house.ramps ? house.ramps.length : '0';
+                                var rampsType = house.ramps ? house.ramps.type : 'Неизвестно';
+                                
+                                var availabilityText = 'Не указано';
+                                if (house.availability) {
+                                    availabilityText = house.availability.assistance ? 'Доступен с помощью' : 'Недоступен';
+                                }
 
-                        // Если лифт есть — выводим размеры в левую панель
-                        if (elevatorCondition.toLowerCase().includes('есть')) {
-                            html += `<div class="info-item"><strong>Размеры лифта (Ш x Д):</strong> ${elevatorWidth} x ${elevatorLength} см</div>`;
+                                // Формируем HTML-шаблон для левой панели информации
+                                var html = `
+                                    <div class="info-item"><strong>Город:</strong> ${city}</div>
+                                    <div class="info-item"><strong>Улица:</strong> ${street}</div>
+                                    <div class="info-item"><strong>Номер дома:</strong> ${number}</div>
+                                    <div class="info-item"><strong>Количество этажей:</strong> ${floors}</div>
+                                    <div class="info-item"><strong>Наличие лифта:</strong> ${elevatorCondition}</div>
+                                `;
+
+                                if (elevatorCondition.toLowerCase().includes('есть')) {
+                                    html += `<div class="info-item"><strong>Размеры лифта (Ш x Д):</strong> ${elevatorWidth} x ${elevatorLength} см</div>`;
+                                }
+                                
+                                if (rampsCondition !== '' && !rampsCondition.toLowerCase().includes('нет')) {
+                                    html += `<div class="info-item"><strong>Наличие пандуса:</strong> Да (${rampsCondition})</div>`;
+                                    html += `<div class="info-item"><strong>Угол наклона пандуса:</strong> ${rampsDegrees}°</div>`;
+                                    html += `<div class="info-item"><strong>Длина пандуса:</strong> ${rampsLength} м</div>`;
+                                    html += `<div class="info-item"><strong>Тип пандуса:</strong> ${rampsType}</div>`;
+                                } else {
+                                    html += `<div class="info-item"><strong>Наличие пандуса:</strong> Нет</div>`;
+                                }
+
+                                html += `<div class="info-item"><strong>Доступность:</strong> ${availabilityText}</div>`;
+                                
+                                infoContent.innerHTML = html;
+
+                                // ЗАПОЛНЯЕМ ФОРМУ СПРАВА ДЛЯ РЕДАКТИРОВАНИЯ:
+                                document.getElementById('sidebar-id').value = house.id;
+                                document.getElementById('sidebar-lat').value = house.latitude;
+                                document.getElementById('sidebar-lng').value = house.longitude;
+                                
+                                if(document.getElementById('id_city') && house.city) document.getElementById('id_city').value = house.city.id;
+                                if(document.getElementById('id_street')) document.getElementById('id_street').value = street;
+                                if(document.getElementById('id_number')) document.getElementById('id_number').value = number;
+                                if(document.getElementById('id_floors')) document.getElementById('id_floors').value = floors;
+                                
+                                if(document.getElementById('id_elevator') && house.elevator) document.getElementById('id_elevator').value = house.elevator.id;
+                                if(document.getElementById('id_elevator_width')) document.getElementById('id_elevator_width').value = elevatorWidth;
+                                if(document.getElementById('id_elevator_length')) document.getElementById('id_elevator_length').value = elevatorLength;
+                                
+                                if(document.getElementById('id_ramps') && house.ramps) document.getElementById('id_ramps').value = house.ramps.id;
+                                if(document.getElementById('id_ramp_degrees')) document.getElementById('id_ramp_degrees').value = rampsDegrees;
+                                if(document.getElementById('id_ramp_length')) document.getElementById('id_ramp_length').value = rampsLength;
+                                if(document.getElementById('id_ramp_type')) document.getElementById('id_ramp_type').value = rampsType;
+                                if(document.getElementById('id_availability') && house.availability) document.getElementById('id_availability').value = house.availability.id;
+
+                                // Принудительно вызываем обновление видимости полей в форме справа
+                                toggleElevatorSizes();
+                                toggleRampSizes();
+                            });
                         }
-                        
-                        // Проверяем наличие пандуса (если в тексте нет слова "Нет" и он вообще выбран)
-                        if (rampsText !== '' && !rampsText.toLowerCase().includes('нет')) {
-                            html += `<div class="info-item"><strong>Наличие пандуса:</strong> Да (${rampsText})</div>`;
-                            html += `<div class="info-item"><strong>Угол наклона пандуса:</strong> ${rampsDegrees}°</div>`;
-                            html += `<div class="info-item"><strong>Длина пандуса:</strong> ${rampsLength} м</div>`;
-                            html += `<div class="info-item"><strong>Тип пандуса:</strong> ${rampsType}</div>`;
-                        } else {
-                            html += `<div class="info-item"><strong>Наличие пандуса:</strong> Нет</div>`;
-                        }
-
-                        html += `<div class="info-item"><strong>Доступность:</strong> ${"{{ house.availability|default:'Не указано' }}"}</div>`;
-                        
-                        // Отправляем собранный HTML в левую панель информации
-                        infoContent.innerHTML = html;
-
-                        // ЗАПОЛНЯЕМ ФОРМУ СПРАВА ДЛЯ РЕДАКТИРОВАНИЯ:
-                        document.getElementById('sidebar-id').value = "{{ house.id }}";
-                        document.getElementById('sidebar-lat').value = "{{ house.latitude }}";
-                        document.getElementById('sidebar-lng').value = "{{ house.longitude }}";
-                        
-                        if(document.getElementById('id_city')) document.getElementById('id_city').value = "{{ house.city.id }}";
-                        if(document.getElementById('id_street')) document.getElementById('id_street').value = street;
-                        if(document.getElementById('id_number')) document.getElementById('id_number').value = number;
-                        if(document.getElementById('id_floors')) document.getElementById('id_floors').value = floors;
-                        
-                        if(document.getElementById('id_elevator')) document.getElementById('id_elevator').value = "{{ house.elevator.id }}";
-                        if(document.getElementById('id_elevator_width')) document.getElementById('id_elevator_width').value = elevatorWidth;
-                        if(document.getElementById('id_elevator_length')) document.getElementById('id_elevator_length').value = elevatorLength;
-                        
-                        // Исправили ID полей под структуру forms.py (убрали лишнюю букву 's' в id_ramp_...)
-                        if(document.getElementById('id_ramps')) document.getElementById('id_ramps').value = "{{ house.ramps.id|default:'' }}";
-                        if(document.getElementById('id_ramp_degrees')) document.getElementById('id_ramp_degrees').value = rampsDegrees;
-                        if(document.getElementById('id_ramp_length')) document.getElementById('id_ramp_length').value = rampsLength;
-                        if(document.getElementById('id_ramp_type')) document.getElementById('id_ramp_type').value = rampsType;
-                        if(document.getElementById('id_availability')) document.getElementById('id_availability').value = "{{ house.availability.id|default:'' }}";
-
-                        // Принудительно вызываем обновление видимости полей в форме справа
-                        toggleElevatorSizes();
-                        toggleRampSizes();
                     });
-                })();
-            {% endif %}
-        {% endfor %}
+                })
+                .catch(error => console.error('Ошибка работы AJAX-запроса:', error));
+        }
+
+        // Вызываем функцию AJAX-загрузки при открытии страницы
+        loadHousesFromAPI();
         // =================================================================
         
         // 2. Клик по карте для добавления новой метки
@@ -175,7 +190,6 @@
 
         map.on('click', onMapClick);
 
-        // Функция управления видимостью полей размеров лифта
         function toggleElevatorSizes() {
             var elevatorSelect = document.getElementById('id_elevator');
             var widthInput = document.getElementById('id_elevator_width');
@@ -198,7 +212,6 @@
             }
         }
 
-        // --- НОВАЯ ФУНКЦИЯ ДЛЯ ДИНАМИЧЕСКОГО СКРЫТИЯ/ПОКАЗА ПОЛЕЙ ПАНДУСА ---
         function toggleRampSizes() {
             var rampsSelect = document.getElementById('id_ramps');
             var degreesInput = document.getElementById('id_ramp_degrees');
@@ -210,12 +223,10 @@
             var degreesContainer = degreesInput.closest('p') || degreesInput.parentElement;
             var lengthContainer = lengthInput.closest('p') || lengthInput.parentElement;
 
-            // Если выбран какой-то пандус и это не вариант "Нет"
             if (rampsSelect.value !== '' && !selectedText.toLowerCase().includes('нет')) {
                 degreesContainer.style.display = 'block';
                 lengthContainer.style.display = 'block';
             } else {
-                // Если пандуса нет — прячем дополнительные поля ввода и очищаем их значения
                 degreesContainer.style.display = 'none';
                 lengthContainer.style.display = 'none';
                 degreesInput.value = '';
@@ -223,23 +234,19 @@
             }
         }
 
-        // Навешиваем события при загрузке DOM структуры страницы
         document.addEventListener("DOMContentLoaded", function() {
-            // Слушатель для лифта
             var elevatorSelect = document.getElementById('id_elevator');
             if (elevatorSelect) {
                 elevatorSelect.addEventListener('change', toggleElevatorSizes);
                 toggleElevatorSizes();
             }
 
-            // Слушатель для пандуса
             var rampsSelect = document.getElementById('id_ramps');
             if (rampsSelect) {
                 rampsSelect.addEventListener('change', toggleRampSizes);
                 toggleRampSizes();
             }
         });
-
     </script>
 </body>
 {% endblock content %}
