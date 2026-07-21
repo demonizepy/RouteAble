@@ -1,57 +1,51 @@
 from django.db import models
 from django.contrib.auth.models import User
 
-# --------------------------------Модели для хранения данных о домах, лифтах, пандусах и их доступности---------------------------------
-class Elevator(models.Model):
-    condition = models.CharField(max_length=100)
-    size_width = models.IntegerField()
-    size_length = models.IntegerField()
-    
-    def __str__(self):
-        return self.condition 
-    
-class City(models.Model):
-    name = models.CharField(max_length=100)
-    
-    def __str__(self):
-        return self.name
-
-class Ramps(models.Model):
-    condition = models.CharField(max_length=100)
-    degrees = models.FloatField()
-    length = models.FloatField()
-    type = models.CharField(max_length=100, default="Неизвестно")  # Добавляем поле для типа пандуса
-
-    # Этот метод скажет Django, какой текст выводить в выпадающем списке формы
-    def __str__(self):
-        return self.condition
+# -------------------------------- Модели данных ---------------------------------
 
 class Availability(models.Model):
-    # Убеждаемся, что тут поле assistance
-    assistance = models.BooleanField(default=False)
+    assistance = models.BooleanField(default=False, verbose_name="Требуется помощь")
 
-    # Этот метод уберет ошибку отображения в форме
+    class Meta:
+        verbose_name = "Доступность"
+        verbose_name_plural = "Варианты доступности"
+
     def __str__(self):
         return "Доступен с помощью" if self.assistance else "Недоступен"
 
+
 class House(models.Model):
-    city = models.ForeignKey('City', on_delete=models.CASCADE)
-    street = models.CharField(max_length=500)
-    number = models.CharField(max_length=100)
-    floors = models.IntegerField()
-    elevator = models.ForeignKey(Elevator, on_delete = models.RESTRICT)
-    ramps = models.ForeignKey('Ramps', on_delete = models.RESTRICT)
-    availability = models.ForeignKey('Availability', on_delete = models.RESTRICT)
-    latitude = models.FloatField()
-    longitude = models.FloatField()
-    user = models.ForeignKey(User, verbose_name='Пользователь', on_delete=models.CASCADE)
+    city = models.CharField(max_length=200, verbose_name="Город")
+    street = models.CharField(max_length=500, verbose_name="Улица")
+    number = models.CharField(max_length=100, verbose_name="Номер дома")
+    floors = models.IntegerField(verbose_name="Этажи")
+
+    # Параметры ЛИФТА
+    has_elevator = models.BooleanField(default=False, verbose_name="Есть лифт")
+    elevator_width = models.IntegerField(null=True, blank=True, verbose_name="Ширина лифта (см)")
+    elevator_length = models.IntegerField(null=True, blank=True, verbose_name="Длина лифта (см)")
+
+    # Параметры ПАНДУСА
+    has_ramp = models.BooleanField(default=False, verbose_name="Есть пандус")
+    ramp_degrees = models.FloatField(null=True, blank=True, verbose_name="Угол наклона пандуса (°)")
+    ramp_length = models.FloatField(null=True, blank=True, verbose_name="Длина пандуса (м)")
+
+    # Доступность и геопозиция
+    availability = models.ForeignKey(
+        'Availability', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        verbose_name="Доступность"
+    )
+    
+    latitude = models.FloatField(verbose_name="Широта")
+    longitude = models.FloatField(verbose_name="Долгота")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Пользователь")
+
+    class Meta:
+        verbose_name = "Дом"
+        verbose_name_plural = "Дома"
 
     def __str__(self):
-        return self.street +' '+ self.number
-    
-
-
-
-
-
-
+        return f"{self.city}, {self.street} {self.number}"

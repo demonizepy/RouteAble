@@ -1,21 +1,35 @@
 from rest_framework import serializers
-from .models import House
-from rest_framework.renderers import JSONRenderer
-from rest_framework.parsers import JSONParser
-import io 
- 
-        
-# -------------------------------Сериализатор для модели House для обработки запросов к API---------------------------------
-class HouseSerializer(serializers.ModelSerializer): # преобразование в словарь для передачи данных в формате JSON и обратно, 
-                                                # определение полей и их типов данных для сериализации и десериализации
-    # user = serializers.HiddenField(default=serializers.CurrentUserDefault()) # добавление поля user для автоматического заполнения текущим пользователем при создании или обновлении объекта House через API, это поле не будет отображаться в API и не требует ввода данных при отправке запроса, данные передаются в формате JSON
-    
+from .models import House, Availability
+
+
+class AvailabilitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Availability
+        fields = ('id', 'assistance')
+
+
+class HouseSerializer(serializers.ModelSerializer):
+    availability = AvailabilitySerializer(read_only=True)
+
     class Meta:
         model = House
-        fields = ('id', 'city', 'street', 'number', 'floors', 'elevator', 'latitude', 'longitude')
-
-
-
+        fields = (
+            'id', 
+            'city', 
+            'street', 
+            'number', 
+            'floors', 
+            'has_elevator', 
+            'elevator_width', 
+            'elevator_length', 
+            'has_ramp', 
+            'ramp_degrees', 
+            'ramp_length', 
+            'availability', 
+            'latitude', 
+            'longitude'
+        )
+        
 # -------------------------------Сериализатор для модели House для обработки запросов к API---------------------------------
 # class HouseModel: # локальные переменные для передачи данных в формате JSON, не связаны с моделью House в models.py
 #     def __init__(self, id, city, street, number, floors, elevator_id, latitude, longitude):
