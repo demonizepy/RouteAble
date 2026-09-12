@@ -31,6 +31,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 urlpatterns = [
     # ------------------------------URL для обработки запросов на отображение страниц сайта---------------------------------
     path('admin/', admin.site.urls, name='admin'), # добавление URL для доступа к административной панели Django, при обращении к этому URL будет вызван соответствующий метод класса AdminSite из библиотеки Django для отображения административной панели
+    path('accounts/', include(('django.contrib.auth.urls', 'accounts'), namespace='accounts')),
+    path('register/', views.register_view, name='register'),
     path('', views.index, name='index'),
     path('talk_People/', views.talk, name='talk'),
     path('Help_People/', views.help, name='help'),

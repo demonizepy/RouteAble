@@ -11,16 +11,27 @@
 </head>
 <body>
     <div class="menubox">
-    <div class="logo">RouteAble</div>
-    
-    <ul class="menu">
-        <li><a href="/">Home</a></li>
-        <li><a href="/talk_People/">Community</a></li>
-        <li><a href="/map/">Map</a></li>
-        <li><a href="/Help_People/">Help</a></li>
-        <li><a href="/Contact_People/">Contact</a></li>
-    </ul>
-</div>
+        <div class="logo">RouteAble</div>
+
+        <ul class="menu">
+            <li><a href="/">Home</a></li>
+            <li><a href="/talk_People/">Community</a></li>
+            <li><a href="/map/">Map</a></li>
+            <li><a href="/Help_People/">Help</a></li>
+            <li><a href="/Contact_People/">Contact</a></li>
+            {% if user.is_authenticated %}
+                <li><span>Привет, {{ user.username }}</span></li>
+                <li>
+                    <form method="post" action="{% url 'accounts:logout' %}?next=/" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit">Выйти</button>
+                    </form>
+                </li>
+            {% else %}
+                <li><a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Войти</a></li>
+            {% endif %}
+        </ul>
+    </div>
     <div>{% block content %}{% endblock content %}</div>
 </body>
 </html>

@@ -27,6 +27,17 @@
             <li><a href="/map/">Map</a></li>
             <li><a href="/Help_People/">Help</a></li>
             <li><a href="/Contact_People/">Contact</a></li>
+            {% if user.is_authenticated %}
+                <li><span>Привет, {{ user.username }}</span></li>
+                <li>
+                    <form method="post" action="{% url 'accounts:logout' %}?next=/" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit">Выйти</button>
+                    </form>
+                </li>
+            {% else %}
+                <li><a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Войти</a></li>
+            {% endif %}
         </ul>
     </div>
 
@@ -45,23 +56,30 @@
         <!-- Карта -->
         <div id="map"></div>
 
-        <!-- Правая панель: Форма -->
-        <div class="sidebar-panel">
-            <h3 id="form-title">Добавить дом</h3>
-            <form method="post">
-                {% csrf_token %}
-                
-                <input type="hidden" id="sidebar-id" name="house_id" value="">
-                <input type="hidden" id="sidebar-lat" name="latitude" value="" required>
-                <input type="hidden" id="sidebar-lng" name="longitude" value="" required>
-                
-                <div class="django-sidebar-form">
-                    {{ form }}
-                </div>
-                
-                <input type="submit" value="Сохранить" class="submit-btn">
-            </form>
-        </div>
+        {% if user.is_authenticated %}
+            <!-- Правая панель: Форма -->
+            <div class="sidebar-panel">
+                <h3 id="form-title">Добавить дом</h3>
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <input type="hidden" id="sidebar-id" name="house_id" value="">
+                    <input type="hidden" id="sidebar-lat" name="latitude" value="" required>
+                    <input type="hidden" id="sidebar-lng" name="longitude" value="" required>
+                    
+                    <div class="django-sidebar-form">
+                        {{ form }}
+                    </div>
+                    
+                    <input type="submit" value="Сохранить" class="submit-btn">
+                </form>
+            </div>
+        {% else %}
+            <div class="sidebar-panel">
+                <h3>Добавить дом</h3>
+                <p>Чтобы добавить объект, <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">войдите</a> или <a href="{% url 'register' %}">зарегистрируйтесь</a>.</p>
+            </div>
+        {% endif %}
 
     </div>
 
@@ -69,8 +87,10 @@
         // 1. Инициализация карты (Новосибирск)
         var map = L.map('map').setView([55.030206, 82.920419], 12);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
         }).addTo(map);
 
         var currentMarker = null;

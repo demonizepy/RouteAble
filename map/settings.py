@@ -27,6 +27,8 @@ SECRET_KEY = 'django-insecure-y2@_3sn%@%*=5m+x&@94ulp7tk_s-cv1d7dfe@9%w!7ynd!hi*
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/map/'
 
 
 # Application definition
@@ -59,7 +61,7 @@ ROOT_URLCONF = 'map.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

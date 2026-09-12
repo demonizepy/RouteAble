@@ -1,10 +1,15 @@
+from urllib.parse import quote
+
 from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.contrib.auth import login
+from django.http import HttpResponseForbidden
+from django.urls import reverse
 from rest_framework import generics
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAdminUser
 
 from main.models import House, Availability
-from .forms import HouseForm
+from .forms import HouseForm, RegisterForm
 from .serializers import HouseSerializer
 from .permissions import IsAdminReadOnly
 from .pagination import HouseApiListPagination
@@ -25,29 +30,50 @@ def help(request):
 def contact(request):
     return render(request, 'page3.html')
 
+def register_view(request):
+    if request.method == 'POST':
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, 'Регистрация успешна.')
+            return redirect('map')
+    else:
+        form = RegisterForm()
+    return render(request, 'registration/register.html', {'form': form})
 
-@login_required(login_url='/login/')
+
 def map_view(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            next_url = quote(request.get_full_path())
+            return redirect(f"/accounts/login/?next={next_url}")
+
         house_id = request.POST.get('house_id')
         instance = House.objects.filter(id=house_id).first() if house_id else None
-        
+
+        if instance and not request.user.is_staff:
+            return HttpResponseForbidden('Изменение домов доступно только администраторам.')
+
         form = HouseForm(request.POST, instance=instance)
-        
+
         if form.is_valid():
             house = form.save(commit=False)
-            
+
             lat = request.POST.get('latitude')
             lng = request.POST.get('longitude')
-            if lat: 
+            if lat:
                 house.latitude = float(lat)
-            if lng: 
+            if lng:
                 house.longitude = float(lng)
-            
-            house.user = request.user
+
+            if instance is None:
+                house.user = request.user
+            else:
+                house.user = instance.user
+
             house.save()
-            
-            return redirect('/map/')
+            return redirect('map')
     else:
         form = HouseForm()
 
@@ -65,7 +91,7 @@ class HouseAPIList(generics.ListCreateAPIView):
 class HouseAPIUpdate(generics.RetrieveUpdateAPIView):
     queryset = House.objects.all()
     serializer_class = HouseSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
     
 class HouseAPIDestroy(generics.RetrieveDestroyAPIView):
     queryset = House.objects.all()
