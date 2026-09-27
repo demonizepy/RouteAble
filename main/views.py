@@ -53,7 +53,8 @@ def map_view(request):
         instance = House.objects.filter(id=house_id).first() if house_id else None
 
         if instance and not request.user.is_staff:
-            return HttpResponseForbidden('Изменение домов доступно только администраторам.')
+            messages.error(request, 'Изменение домов доступно только администраторам.')
+            return redirect('map')
 
         form = HouseForm(request.POST, instance=instance)
 

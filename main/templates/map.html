@@ -5,15 +5,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""/>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""></script>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=f1ebb7fe-d5d1-48fe-9482-318efc5bb3b1&lang=ru_RU"></script>
     
     <link rel="stylesheet" type="text/css" href="{% static 'main/style.css' %}">
+    <style>
+        .toast-container {
+            position: fixed;
+            top: 70px;
+            right: 24px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            min-width: 260px;
+            max-width: 360px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            background: rgba(52, 58, 64, 0.96);
+            color: #fff;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            border-left: 5px solid #ffb703;
+            opacity: 1;
+            transform: translateX(0);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            pointer-events: auto;
+        }
+
+        .toast.hide {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+    </style>
     <title>RouteAble Map</title>
 </head>
 
@@ -22,11 +48,11 @@
     <div class="menubox">
         <div class="logo">RouteAble</div>
         <ul class="menu">
-            <li><a href="/">Home</a></li>
-            <li><a href="/talk_People/">Community</a></li>
-            <li><a href="/map/">Map</a></li>
-            <li><a href="/Help_People/">Help</a></li>
-            <li><a href="/Contact_People/">Contact</a></li>
+            <li><a href="/">Главная</a></li>
+            <li><a href="/talk_People/">Сообщество</a></li>
+            <li><a href="/map/">Карта</a></li>
+            <li><a href="/Help_People/">Помощь</a></li>
+            <li><a href="/Contact_People/">Контакты</a></li>
             {% if user.is_authenticated %}
                 <li><span>Привет, {{ user.username }}</span></li>
                 <li>
@@ -39,6 +65,16 @@
                 <li><a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Войти</a></li>
             {% endif %}
         </ul>
+    </div>
+
+    <div class="toast-container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="toast" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
     </div>
 
     <div class="map-layout-container">
@@ -84,21 +120,12 @@
     </div>
 
     <script>
-        // 1. Инициализация карты (Новосибирск)
-        var map = L.map('map').setView([55.030206, 82.920419], 12);
-
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 20
-        }).addTo(map);
-
-        var currentMarker = null;
+        var map;
+        var currentPlacemark = null;
         var latInput = document.getElementById('sidebar-lat');
         var lngInput = document.getElementById('sidebar-lng');
         var infoContent = document.getElementById('info-content');
 
-        // Вспомогательная функция для записи значений в элементы формы
         function setInputValue(id, val) {
             var el = document.getElementById(id);
             if (el) {
@@ -112,7 +139,6 @@
             return false;
         }
 
-        // Переключение видимости размеров лифта (чекбокс id_has_elevator)
         function toggleElevatorSizes() {
             var checkbox = document.getElementById('id_has_elevator');
             var widthInput = document.getElementById('id_elevator_width');
@@ -132,7 +158,6 @@
             }
         }
 
-        // Переключение видимости размеров пандуса (чекбокс id_has_ramp)
         function toggleRampSizes() {
             var checkbox = document.getElementById('id_has_ramp');
             var degreesInput = document.getElementById('id_ramp_degrees');
@@ -152,7 +177,6 @@
             }
         }
 
-        // Очистка формы при создании нового объекта
         function resetForm() {
             var formTitle = document.getElementById('form-title');
             if (formTitle) formTitle.innerText = 'Добавить дом';
@@ -162,11 +186,11 @@
             setInputValue('id_street', '');
             setInputValue('id_number', '');
             setInputValue('id_floors', '');
-            
+
             setInputValue('id_has_elevator', false);
             setInputValue('id_elevator_width', '');
             setInputValue('id_elevator_length', '');
-            
+
             setInputValue('id_has_ramp', false);
             setInputValue('id_ramp_degrees', '');
             setInputValue('id_ramp_length', '');
@@ -186,106 +210,104 @@
             }
         }
 
-        // Автоматическое определение адреса через OSM Nominatim
         function fetchAddress(lat, lng) {
-            var url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=ru`;
+            ymaps.geocode([lat, lng], { results: 1 }).then(function (res) {
+                var first = res.geoObjects.get(0);
+                if (!first) return;
 
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.address) {
-                        var addr = data.address;
-                        var cityName = addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
-                        var streetName = addr.road || addr.pedestrian || addr.suburb || '';
-                        var houseNumber = addr.house_number || '';
+                var addressDetails = first.properties.get('metaDataProperty.GeocoderMetaData.AddressDetails');
+                var country = addressDetails && addressDetails.Country ? addressDetails.Country : null;
+                var area = country && country.AdministrativeArea ? country.AdministrativeArea : null;
+                var locality = area && area.Locality ? area.Locality : null;
+                var thoroughfare = locality && locality.Thoroughfare ? locality.Thoroughfare : null;
+                var premise = thoroughfare && thoroughfare.Premise ? thoroughfare.Premise : null;
 
-                        setInputValue('id_city', cityName);
-                        setInputValue('id_street', streetName);
-                        setInputValue('id_number', houseNumber);
-                    }
-                })
-                .catch(err => console.error('Ошибка определения адреса:', err));
+                var cityName = (locality && locality.LocalityName) || (area && area.AdministrativeAreaName) || '';
+                var streetName = (thoroughfare && thoroughfare.ThoroughfareName) || '';
+                var houseNumber = (premise && premise.PremiseNumber) || '';
+
+                setInputValue('id_city', cityName);
+                setInputValue('id_street', streetName);
+                setInputValue('id_number', houseNumber);
+            }).catch(function (err) {
+                console.error('Ошибка определения адреса:', err);
+            });
         }
 
-        // Клик по карте для добавления новой точки
         function onMapClick(e) {
             resetForm();
 
-            var lat = e.latlng.lat.toFixed(6);
-            var lng = e.latlng.lng.toFixed(6);
+            var coords = e.get('coords');
+            var lat = Number(coords[0].toFixed(6));
+            var lng = Number(coords[1].toFixed(6));
 
             if (latInput) latInput.value = lat;
             if (lngInput) lngInput.value = lng;
 
-            if (currentMarker) {
-                currentMarker.setLatLng(e.latlng);
+            if (currentPlacemark) {
+                currentPlacemark.geometry.setCoordinates(coords);
             } else {
-                currentMarker = L.marker(e.latlng).addTo(map);
+                currentPlacemark = new ymaps.Placemark(coords, { hintContent: 'Новый дом' }, {
+                    preset: 'islands#redDotIcon'
+                });
+                map.geoObjects.add(currentPlacemark);
             }
 
             fetchAddress(lat, lng);
         }
 
-        map.on('click', onMapClick);
-
-        // =================================================================
-        // ЗАГРУЗКА И ОТОБРАЖЕНИЕ МАРКЕРОВ
-        // =================================================================
         function loadHousesFromAPI() {
             fetch('/api/v1/houses/')
-                .then(response => {
+                .then(function (response) {
                     if (!response.ok) throw new Error('Ошибка сети при запросе к API');
                     return response.json();
                 })
-                .then(data => {
+                .then(function (data) {
                     var houses = data.results ? data.results : data;
 
-                    houses.forEach(house => {
+                    houses.forEach(function (house) {
                         if (house.latitude && house.longitude) {
-                            var marker = L.marker([house.latitude, house.longitude]).addTo(map);
-                            
-                            marker.on('click', function(e) {
-                                if (e && e.originalEvent) {
-                                    e.originalEvent.stopPropagation();
+                            var placemark = new ymaps.Placemark([house.latitude, house.longitude], {
+                                balloonContent: 'Дом #' + house.id
+                            }, {
+                                preset: 'islands#blueDotIcon'
+                            });
+
+                            placemark.events.add('click', function () {
+                                var formTitle = document.getElementById('form-title');
+                                if (formTitle) {
+                                    formTitle.innerText = 'Редактировать дом (ID: ' + house.id + ')';
                                 }
 
-                                document.getElementById('form-title').innerText = 'Редактировать дом (ID: ' + house.id + ')';
-                                
                                 setInputValue('sidebar-id', house.id);
                                 setInputValue('sidebar-lat', house.latitude);
                                 setInputValue('sidebar-lng', house.longitude);
-                                
+
                                 setInputValue('id_city', house.city || '');
                                 setInputValue('id_street', house.street || '');
                                 setInputValue('id_number', house.number || '');
                                 setInputValue('id_floors', house.floors || '');
-                                
-                                // Устанавливаем данные лифта
+
                                 setInputValue('id_has_elevator', house.has_elevator);
                                 setInputValue('id_elevator_width', house.elevator_width);
                                 setInputValue('id_elevator_length', house.elevator_length);
-                                
-                                // Устанавливаем данные пандуса
+
                                 setInputValue('id_has_ramp', house.has_ramp);
                                 setInputValue('id_ramp_degrees', house.ramp_degrees);
                                 setInputValue('id_ramp_length', house.ramp_length);
-                                
-                                // Доступность
+
                                 var availabilityId = house.availability ? house.availability.id : '';
                                 setInputValue('id_availability', availabilityId);
 
-                                // Переключаем отображение полей ввода в форме
                                 toggleElevatorSizes();
                                 toggleRampSizes();
 
-                                // Рендерим блок "Информация об объекте"
                                 var cityName = house.city || 'Не указан';
                                 var elevatorStatus = house.has_elevator ? 'Есть' : 'Нет';
                                 var rampStatus = house.has_ramp ? 'Есть' : 'Нет';
-                                
                                 var availabilityText = 'Не указано';
                                 if (house.availability) {
-                                    availabilityText = house.availability.assistance ? "Доступен с помощью" : "Недоступен";
+                                    availabilityText = house.availability.assistance ? 'Доступен с помощью' : 'Недоступен';
                                 }
 
                                 var html = `
@@ -299,28 +321,39 @@
                                 if (house.has_elevator) {
                                     html += `<div class="info-item"><strong>РАЗМЕРЫ ЛИФТА (Ш X Д):</strong> ${house.elevator_width || 0} x ${house.elevator_length || 0} см</div>`;
                                 }
-                                
+
                                 html += `<div class="info-item"><strong>НАЛИЧИЕ ПАНДУСА:</strong> ${rampStatus}</div>`;
-                                
+
                                 if (house.has_ramp) {
                                     html += `<div class="info-item"><strong>УГОЛ НАКЛОНА ПАНДУСА:</strong> ${house.ramp_degrees || 0}°</div>`;
                                     html += `<div class="info-item"><strong>ДЛИНА ПАНДУСА:</strong> ${house.ramp_length || 0} м</div>`;
                                 }
 
                                 html += `<div class="info-item"><strong>ДОСТУПНОСТЬ:</strong> ${availabilityText}</div>`;
-                                
                                 infoContent.innerHTML = html;
                             });
+
+                            map.geoObjects.add(placemark);
                         }
                     });
                 })
-                .catch(error => console.error('Ошибка работы AJAX-запроса:', error));
+                .catch(function (error) {
+                    console.error('Ошибка работы AJAX-запроса:', error);
+                });
         }
 
-        loadHousesFromAPI();
+        ymaps.ready(function () {
+            map = new ymaps.Map('map', {
+                center: [55.030206, 82.920419],
+                zoom: 12,
+                controls: ['zoomControl', 'fullscreenControl']
+            });
 
-        // Привязка событий переключения полей к чекбоксам
-        document.addEventListener("DOMContentLoaded", function() {
+            map.events.add('click', onMapClick);
+            loadHousesFromAPI();
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
             var elevatorCheckbox = document.getElementById('id_has_elevator');
             if (elevatorCheckbox) {
                 elevatorCheckbox.addEventListener('change', toggleElevatorSizes);
@@ -333,6 +366,16 @@
 
             toggleElevatorSizes();
             toggleRampSizes();
+
+            var toastList = document.querySelectorAll('.toast');
+            toastList.forEach(function (toast) {
+                setTimeout(function () {
+                    toast.classList.add('hide');
+                    setTimeout(function () {
+                        toast.remove();
+                    }, 500);
+                }, 2200);
+            });
         });
     </script>
 </body>

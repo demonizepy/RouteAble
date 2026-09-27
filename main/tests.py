@@ -26,6 +26,11 @@ class HouseAccessTests(TestCase):
         response = self.client.get(reverse('map'))
         self.assertEqual(response.status_code, 200)
 
+    def test_map_has_guard_for_missing_form_title(self):
+        response = self.client.get(reverse('map'))
+        self.assertContains(response, "var formTitle = document.getElementById('form-title');")
+        self.assertContains(response, "if (formTitle) {")
+
     def test_create_house_requires_login(self):
         response = self.client.post(reverse('map'), {
             'city': 'Town',
@@ -51,9 +56,10 @@ class HouseAccessTests(TestCase):
             'latitude': 55.0,
             'longitude': 82.0,
             'availability': self.availability.id,
-        })
+        }, follow=True)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Изменение домов доступно только администраторам.')
 
     def test_admin_can_edit_existing_house(self):
         self.client.login(username='admin', password='secret123')
